@@ -30,10 +30,10 @@ struct llama_sampling_context * llama_sampling_init(const struct llama_sampling_
 }
 
 void llama_sampling_free(struct llama_sampling_context * ctx) {
-    if (ctx->grammar != NULL) {
+    if (ctx->grammar) {
         llama_grammar_free(ctx->grammar);
     }
-
+    
     delete ctx;
 }
 

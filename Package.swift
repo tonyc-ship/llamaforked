@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "llama",
+    name: "llamaforked",
     platforms: [
         .macOS(.v12),
         .iOS(.v14),
@@ -11,15 +11,15 @@ let package = Package(
         .tvOS(.v14)
     ],
     products: [
-        .library(name: "llama", targets: ["llama"]),
+        .library(name: "llamaforked", targets: ["llamaforked"]),
     ],
     targets: [
         .target(
-            name: "llama",
+            name: "llamaforked",
             path: ".",
             exclude: [
                "cmake",
-               "examples",
+            //    "examples",
                "scripts",
                "models",
                "tests",
@@ -35,6 +35,11 @@ let package = Package(
                 "ggml-backend.c",
                 "ggml-quants.c",
                 "ggml-metal.m",
+                "cym-test.cpp",
+                "examples/llava/llava-cli.cpp",
+                "examples/llava/clip.cpp", "examples/llava/llava.cpp", 
+                "common/common.cpp", "common/sampling.cpp", "common/grammar-parser.cpp",
+                "whisper.cpp"
             ],
             resources: [
                 .process("ggml-metal.metal")
@@ -44,7 +49,7 @@ let package = Package(
                 .unsafeFlags(["-Wno-shorten-64-to-32", "-O3", "-DNDEBUG"]),
                 .define("GGML_USE_ACCELERATE"),
                 .unsafeFlags(["-fno-objc-arc"]),
-                .define("GGML_USE_METAL"),
+                // .define("GGML_USE_METAL"),
                 // NOTE: NEW_LAPACK will required iOS version 16.4+
                 // We should consider add this in the future when we drop support for iOS 14
                 // (ref: ref: https://developer.apple.com/documentation/accelerate/1513264-cblas_sgemm?language=objc)

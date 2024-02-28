@@ -1,5 +1,9 @@
 #include "common.h"
+#if SWIFT_PACKAGE
+#include "../llama.h"
+#else
 #include "llama.h"
+#endif
 
 #include <algorithm>
 #include <cassert>

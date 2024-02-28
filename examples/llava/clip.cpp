@@ -12,11 +12,19 @@
 #endif
 
 #ifdef GGML_USE_METAL
+#if SWIFT_PACKAGE
+#include "../ggml-metal.h"
+#else
 #include "ggml-metal.h"
+#endif
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
+#if SWIFT_PACKAGE
+#include "../../common/stb_image.h"
+#else
 #include "stb_image.h"
+#endif
 
 #include <cassert>
 #include <cmath>

@@ -18,6 +18,9 @@
 #endif
 
 struct clip_ctx;
+struct llama_context;
+struct clip_image_u8;
+struct llava_image_embed;
 
 #ifdef __cplusplus
 extern "C" {

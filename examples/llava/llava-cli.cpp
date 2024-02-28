@@ -1,10 +1,15 @@
 #include "ggml.h"
-#include "common.h"
 #include "clip.h"
 #include "llava.h"
 #include "llama.h"
-
+#if SWIFT_PACKAGE
+#include "../../common/common.h"
+#include "../../common/base64.hpp"
+#include "../../spm-headers/llava-public.h"
+#else
+#include "common.h"
 #include "base64.hpp"
+#endif
 
 #include <cstdio>
 #include <cstdlib>
@@ -207,7 +212,6 @@ static void process_prompt(struct llava_context * ctx_llava, struct llava_image_
     printf("\n");
 }
 
-
 static struct llava_context * llava_init(gpt_params * params) {
     const char * clip_path = params->mmproj.c_str();
 
@@ -258,38 +262,143 @@ static void llava_free(struct llava_context * ctx_llava) {
     llama_backend_free();
 }
 
-int main(int argc, char ** argv) {
-    ggml_time_init();
+// int main_llava(int argc, char ** argv) {
+//     ggml_time_init();
 
+//     gpt_params params;
+
+//     if (!gpt_params_parse(argc, argv, params)) {
+//         show_additional_info(argc, argv);
+//         return 1;
+//     }
+//     if (params.mmproj.empty() || (params.image.empty() && !prompt_contains_image(params.prompt))) {
+//         gpt_print_usage(argc, argv, params);
+//         show_additional_info(argc, argv);
+//         return 1;
+//     }
+
+//     auto ctx_llava = llava_init(&params);
+//     if (ctx_llava == NULL) {
+//         fprintf(stderr, "%s: error: failed to init llava\n", __func__);
+//         return 1;
+//     }
+
+//     auto image_embed = load_image(ctx_llava, &params);
+//     if (!image_embed) {
+//         return 1;
+//     }
+
+//     // process the prompt
+//     process_prompt(ctx_llava, image_embed, &params, params.prompt);
+
+//     llama_print_timings(ctx_llava->ctx_llama);
+
+//     llava_image_embed_free(image_embed);
+//     llava_free(ctx_llava);
+//     return 0;
+// }
+
+struct llava_cli_context {
+    struct llava_context * ctx_llava = NULL;
+    struct llava_image_embed * image_embed = NULL;
+    struct llama_sampling_context * ctx_sampling = NULL;
+    int n_past = 0;
+};
+
+struct llava_cli_context * llava_init(const char * mmproj_path,
+                const char * model_path,
+                const char * prompt,
+                int32_t n_ctx) {
     gpt_params params;
+    params.mmproj = std::string(mmproj_path);
+    params.model = std::string(model_path);
+    params.prompt = std::string(prompt);
+    params.n_ctx = n_ctx;
 
-    if (!gpt_params_parse(argc, argv, params)) {
-        show_additional_info(argc, argv);
-        return 1;
+    llava_cli_context * ctx_cli = (struct llava_cli_context *)malloc(sizeof(llava_cli_context));
+    ctx_cli->ctx_llava = llava_init(&params);
+    return ctx_cli;
+}
+
+void load_image(struct llava_cli_context * ctx_cli, const char * base64_img) {
+    gpt_params params;
+    ctx_cli->image_embed = llava_image_embed_make_with_prompt_base64(ctx_cli->ctx_llava->ctx_clip, params.n_threads, base64_img);
+}
+
+void completion_init(struct llava_cli_context * ctx_cli, const char * prompt_in) {
+    struct llava_context * ctx_llava = ctx_cli->ctx_llava;
+    struct llava_image_embed * image_embed = ctx_cli->image_embed;
+    std::string prompt = std::string(prompt_in);
+    gpt_params* params = new gpt_params();
+    int n_past = 0;
+
+    const int max_tgt_len = params->n_predict < 0 ? 256 : params->n_predict;
+    const bool add_bos = llama_should_add_bos_token(llama_get_model(ctx_llava->ctx_llama));
+
+    std::string system_prompt, user_prompt;
+    size_t image_pos = prompt.find("<image>");
+    if (image_pos != std::string::npos) {
+        // new templating mode: Provide the full prompt including system message and use <image> as a placeholder for the image
+        system_prompt = prompt.substr(0, image_pos);
+        user_prompt = prompt.substr(image_pos + std::string("<image>").length());
+        printf("system_prompt: %s\n", system_prompt.c_str());
+        if (params->verbose_prompt) {
+            auto tmp = ::llama_tokenize(ctx_llava->ctx_llama, system_prompt, true, true);
+            for (int i = 0; i < (int) tmp.size(); i++) {
+                printf("%6d -> '%s'\n", tmp[i], llama_token_to_piece(ctx_llava->ctx_llama, tmp[i]).c_str());
+            }
+        }
+        printf("user_prompt: %s\n", user_prompt.c_str());
+        if (params->verbose_prompt) {
+            auto tmp = ::llama_tokenize(ctx_llava->ctx_llama, user_prompt, true, true);
+            for (int i = 0; i < (int) tmp.size(); i++) {
+                printf("%6d -> '%s'\n", tmp[i], llama_token_to_piece(ctx_llava->ctx_llama, tmp[i]).c_str());
+            }
+        }
+    } else {
+        // llava-1.5 native mode
+        system_prompt = "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\nUSER:";
+        user_prompt = prompt + "\nASSISTANT:";
+        if (params->verbose_prompt) {
+            auto tmp = ::llama_tokenize(ctx_llava->ctx_llama, user_prompt, true, true);
+            for (int i = 0; i < (int) tmp.size(); i++) {
+                printf("%6d -> '%s'\n", tmp[i], llama_token_to_piece(ctx_llava->ctx_llama, tmp[i]).c_str());
+            }
+        }
     }
-    if (params.mmproj.empty() || (params.image.empty() && !prompt_contains_image(params.prompt))) {
-        gpt_print_usage(argc, argv, params);
-        show_additional_info(argc, argv);
-        return 1;
+
+    eval_string(ctx_llava->ctx_llama, system_prompt.c_str(), params->n_batch, &n_past, add_bos);
+    if (image_embed) {
+        llava_eval_image_embed(ctx_llava->ctx_llama, image_embed, params->n_batch, &n_past);
     }
+    eval_string(ctx_llava->ctx_llama, user_prompt.c_str(), params->n_batch, &n_past, false);
+    ctx_cli->n_past = n_past;
+    ctx_cli->ctx_sampling = llama_sampling_init(params->sparams);
+}
 
-    auto ctx_llava = llava_init(&params);
-    if (ctx_llava == NULL) {
-        fprintf(stderr, "%s: error: failed to init llava\n", __func__);
-        return 1;
+const char * completion_loop(struct llava_cli_context * ctx_cli) {
+    gpt_params* params = new gpt_params();
+    const char * tmp = sample(ctx_cli->ctx_sampling, ctx_cli->ctx_llava->ctx_llama, &(ctx_cli->n_past));
+    return tmp;
+}
+
+void llava_free(struct llava_cli_context * ctx_cli, bool free_all) {
+    if (ctx_cli) {
+        if (ctx_cli->ctx_sampling) {
+            llama_sampling_free(ctx_cli->ctx_sampling);
+            ctx_cli->ctx_sampling = NULL;
+        }
+        if (ctx_cli->image_embed) {
+            llava_image_embed_free(ctx_cli->image_embed);
+            ctx_cli->image_embed = NULL;
+        }
+        if (ctx_cli->ctx_llava && ctx_cli->ctx_llava->ctx_llama) {
+            llama_kv_cache_clear(ctx_cli->ctx_llava->ctx_llama);
+        }
+        
+        if (free_all && ctx_cli->ctx_llava) {
+            llava_free(ctx_cli->ctx_llava);
+            ctx_cli->ctx_llava = NULL;
+        }
     }
-
-    auto image_embed = load_image(ctx_llava, &params);
-    if (!image_embed) {
-        return 1;
-    }
-
-    // process the prompt
-    process_prompt(ctx_llava, image_embed, &params, params.prompt);
-
-    llama_print_timings(ctx_llava->ctx_llama);
-
-    llava_image_embed_free(image_embed);
-    llava_free(ctx_llava);
-    return 0;
 }

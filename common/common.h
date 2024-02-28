@@ -32,10 +32,14 @@
 } while(0)
 
 // build info
-extern int LLAMA_BUILD_NUMBER;
-extern char const *LLAMA_COMMIT;
-extern char const *LLAMA_COMPILER;
-extern char const *LLAMA_BUILD_TARGET;
+// extern int LLAMA_BUILD_NUMBER;
+// extern char const *LLAMA_COMMIT;
+// extern char const *LLAMA_COMPILER;
+// extern char const *LLAMA_BUILD_TARGET;
+#define LLAMA_BUILD_NUMBER 0
+#define LLAMA_COMMIT "0"
+#define LLAMA_COMPILER "0"
+#define LLAMA_BUILD_TARGET "0"
 
 //
 // CLI argument parsing

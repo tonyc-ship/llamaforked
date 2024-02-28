@@ -1,8 +1,13 @@
 #include "clip.h"
-#include "common.h"
 #include "llama.h"
 #include "llava.h"
+#if SWIFT_PACKAGE
+#include "../../common/common.h"
+#include "../../common/base64.hpp"
+#else
+#include "common.h"
 #include "base64.hpp"
+#endif
 
 #include <cstdio>
 #include <cstdlib>
