@@ -39,7 +39,7 @@ let package = Package(
                 "examples/llava/llava-cli.cpp",
                 "examples/llava/clip.cpp", "examples/llava/llava.cpp", 
                 "common/common.cpp", "common/sampling.cpp", "common/grammar-parser.cpp",
-                "whisper.cpp"
+                "whisper.cpp", "common_whisper.cpp"
             ],
             resources: [
                 .process("ggml-metal.metal")
