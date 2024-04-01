@@ -24,7 +24,7 @@ LLAVA_API struct llava_cli_context * llava_init(
     const char * prompt,
     int32_t n_ctx);
 
-LLAVA_API void load_image(struct llava_cli_context * ctx_cli, const char * base64_img);
+LLAVA_API void load_image(const char * mmproj_path, struct llava_cli_context * ctx_cli, const char * base64_img);
 
 LLAVA_API void completion_init(struct llava_cli_context * ctx_cli, const char * prompt_in);
 LLAVA_API const char * completion_loop(struct llava_cli_context * ctx_cli);

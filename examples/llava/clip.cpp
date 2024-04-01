@@ -12,11 +12,11 @@
 #endif
 
 #ifdef GGML_USE_METAL
-#if SWIFT_PACKAGE
-#include "../ggml-metal.h"
-#else
-#include "ggml-metal.h"
-#endif
+//#if SWIFT_PACKAGE
+//#include "../ggml-metal.h"
+//#else
+//#include "ggml-metal.h"
+//#endif
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -996,8 +996,8 @@ struct clip_ctx * clip_model_load(const char * fname, const int verbosity = 1) {
 #endif
 
 #ifdef GGML_USE_METAL
-    new_clip->backend = ggml_backend_metal_init();
-    printf("%s: CLIP using Metal backend\n", __func__);
+//    new_clip->backend = ggml_backend_metal_init();
+//    printf("%s: CLIP using Metal backend\n", __func__);
 #endif
 
 
@@ -1735,6 +1735,10 @@ ggml_tensor * clip_get_newline_tensor(const struct clip_ctx * ctx) {
 void clip_free(clip_ctx * ctx) {
     ggml_free(ctx->ctx_data);
     gguf_free(ctx->ctx_gguf);
+    
+    ggml_backend_free(ctx->backend);
+    ggml_backend_buffer_free(ctx->params_buffer);
+    ggml_backend_buffer_free(ctx->compute_buffer);
 
     delete ctx;
 }
@@ -1872,9 +1876,9 @@ bool clip_image_batch_encode(clip_ctx * ctx, const int n_threads, const clip_ima
     }
 
 #ifdef GGML_USE_METAL
-    if (ggml_backend_is_metal(ctx->backend)) {
-        ggml_backend_metal_set_n_cb(ctx->backend, n_threads);
-    }
+//    if (ggml_backend_is_metal(ctx->backend)) {
+//        ggml_backend_metal_set_n_cb(ctx->backend, n_threads);
+//    }
 #endif
 
     ggml_backend_graph_compute(ctx->backend, gf);

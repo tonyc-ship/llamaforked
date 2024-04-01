@@ -212,15 +212,23 @@ static void process_prompt(struct llava_context * ctx_llava, struct llava_image_
     printf("\n");
 }
 
-static struct llava_context * llava_init(gpt_params * params) {
-    const char * clip_path = params->mmproj.c_str();
-
-    auto prompt = params->prompt;
-    if (prompt.empty()) {
-        prompt = "describe the image in detail.";
+static void clip_init(struct llava_context * ctx_llava, const char * clip_path) {
+    ctx_llava->ctx_clip = clip_model_load(clip_path, /*verbosity=*/ 1);
+    if (ctx_llava->ctx_clip == NULL) {
+        fprintf(stderr, "%s: error: failed to load clip model\n", __func__);
+        exit(1);
     }
+}
 
-    auto ctx_clip = clip_model_load(clip_path, /*verbosity=*/ 1);
+static struct llava_context * llava_init(gpt_params * params) {
+//    const char * clip_path = params->mmproj.c_str();
+//
+//    auto prompt = params->prompt;
+//    if (prompt.empty()) {
+//        prompt = "describe the image in detail.";
+//    }
+//
+//    auto ctx_clip = clip_model_load(clip_path, /*verbosity=*/ 1);
 
     llama_backend_init();
     llama_numa_init(params->numa);
@@ -246,7 +254,7 @@ static struct llava_context * llava_init(gpt_params * params) {
     auto ctx_llava = (struct llava_context *)malloc(sizeof(llava_context));
 
     ctx_llava->ctx_llama = ctx_llama;
-    ctx_llava->ctx_clip = ctx_clip;
+//    ctx_llava->ctx_clip = ctx_clip;
     ctx_llava->model = model;
     return ctx_llava;
 }
@@ -320,7 +328,11 @@ struct llava_cli_context * llava_init(const char * mmproj_path,
     return ctx_cli;
 }
 
-void load_image(struct llava_cli_context * ctx_cli, const char * base64_img) {
+void load_image(const char * mmproj_path, struct llava_cli_context * ctx_cli, const char * base64_img) {
+    if (ctx_cli->ctx_llava->ctx_clip == NULL) {
+        clip_init(ctx_cli->ctx_llava, mmproj_path);
+    }
+
     gpt_params params;
     ctx_cli->image_embed = llava_image_embed_make_with_prompt_base64(ctx_cli->ctx_llava->ctx_clip, params.n_threads, base64_img);
 }
